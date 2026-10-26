@@ -18,5 +18,6 @@ cat > $APP/Contents/Info.plist <<PLIST
 <key>NSAppleEventsUsageDescription</key><string>Reads the folder open in Finder.</string>
 </dict></plist>
 PLIST
-codesign -s - --force $APP
+ID=5D2G58P6ZB; security find-identity -v -p codesigning | grep -q $ID || ID=-
+codesign -s $ID --options runtime --entitlements NewFileMaker.entitlements -i com.dulangaj.NewFileMaker --force $APP
 echo "Built $PWD/$APP"

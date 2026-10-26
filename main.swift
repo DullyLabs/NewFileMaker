@@ -35,26 +35,35 @@ final class Picker: NSObject {
     @objc func pick(_ item: NSMenuItem) { choice = item.tag }
 }
 
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    let picker = Picker()
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.activate(ignoringOtherApps: true)
+        let menu = NSMenu()
+        for (i, t) in types.enumerated() {
+            let item = NSMenuItem(title: t.0, action: #selector(Picker.pick(_:)), keyEquivalent: "")
+            item.target = picker
+            item.tag = i
+            item.image = NSWorkspace.shared.icon(for: UTType(filenameExtension: t.1) ?? .data)
+            item.image?.size = NSSize(width: 18, height: 18)
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+
+        if let i = picker.choice {
+            let (_, ext, body) = types[i]
+            let url = uniqueURL(in: finderDirectory(), ext: ext)
+            let attrs: [FileAttributeKey: Any]? = ext == "sh" ? [.posixPermissions: 0o755] : nil
+            FileManager.default.createFile(atPath: url.path, contents: Data(body.utf8), attributes: attrs)
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
+        NSApp.terminate(nil)
+    }
+}
+
 let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
 app.setActivationPolicy(.accessory)
-app.activate(ignoringOtherApps: true)
-
-let picker = Picker()
-let menu = NSMenu()
-for (i, t) in types.enumerated() {
-    let item = NSMenuItem(title: t.0, action: #selector(Picker.pick(_:)), keyEquivalent: "")
-    item.target = picker
-    item.tag = i
-    item.image = NSWorkspace.shared.icon(for: UTType(filenameExtension: t.1) ?? .data)
-    item.image?.size = NSSize(width: 18, height: 18)
-    menu.addItem(item)
-}
-menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
-
-if let i = picker.choice {
-    let (_, ext, body) = types[i]
-    let url = uniqueURL(in: finderDirectory(), ext: ext)
-    let attrs: [FileAttributeKey: Any]? = ext == "sh" ? [.posixPermissions: 0o755] : nil
-    FileManager.default.createFile(atPath: url.path, contents: Data(body.utf8), attributes: attrs)
-    NSWorkspace.shared.activateFileViewerSelecting([url])
-}
+app.run()
