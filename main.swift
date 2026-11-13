@@ -38,7 +38,21 @@ final class Picker: NSObject {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let picker = Picker()
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        NSApp.servicesProvider = self
+    }
+
+    // "Copy Full Path" service (NSServices in build.sh): puts the selected items' paths on the clipboard.
+    @objc func copyPath(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString>) {
+        let urls = pboard.readObjects(forClasses: [NSURL.self]) as? [URL] ?? []
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(urls.map(\.path).joined(separator: "\n"), forType: .string)
+        NSApp.terminate(nil)
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // A launch to run the service isn't a default launch; skip the menu.
+        if notification.userInfo?[NSApplication.launchIsDefaultUserInfoKey] as? Bool == false { return }
         NSApp.activate(ignoringOtherApps: true)
         let menu = NSMenu()
         for (i, t) in types.enumerated() {

@@ -16,6 +16,13 @@ cat > $APP/Contents/Info.plist <<PLIST
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>LSUIElement</key><true/>
 <key>NSAppleEventsUsageDescription</key><string>Reads the folder open in Finder.</string>
+<key>NSServices</key><array><dict>
+<key>NSMenuItem</key><dict><key>default</key><string>Copy Full Path</string></dict>
+<key>NSMessage</key><string>copyPath</string>
+<key>NSPortName</key><string>NewFileMaker</string>
+<key>NSRequiredContext</key><dict/>
+<key>NSSendFileTypes</key><array><string>public.item</string></array>
+</dict></array>
 </dict></plist>
 PLIST
 ID=5D2G58P6ZB; security find-identity -v -p codesigning | grep -q $ID || ID=-
