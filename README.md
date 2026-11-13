@@ -4,7 +4,7 @@ A Finder toolbar button for making new files. Click it, pick a file type, and yo
 
 ![Menu](screenshot.png)
 
-The menu offers Text, Markdown, Rich Text, Shell Script, Python, Swift, JSON, HTML and CSV. The new file lands in the folder open in the front Finder window, and Finder selects it so you can rename it straight away. If `Untitled.txt` already exists you get `Untitled 2.txt`, and so on. Shell scripts start with a `#!/bin/zsh` line and are already executable.
+The menu offers Text, Markdown, Rich Text, Shell Script, Python, Swift, JSON, HTML, CSV and Pages. The new file lands in the folder open in the front Finder window, and Finder selects it so you can rename it straight away. If `Untitled.txt` already exists you get `Untitled 2.txt`, and so on. Shell scripts start with a `#!/bin/zsh` line and are already executable. Pages files are blank documents.
 
 Right-click any files or folders in Finder and choose **Copy Full Path** to put their paths on the clipboard, one per line.
 

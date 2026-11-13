@@ -2,6 +2,7 @@ import AppKit
 import UniformTypeIdentifiers
 
 // File types offered in the menu: (label, extension, initial contents).
+// Extensions with a Templates/Untitled.<ext> copy that blank document instead.
 let types: [(String, String, String)] = [
     ("Text File", "txt", ""),
     ("Markdown File", "md", ""),
@@ -12,6 +13,7 @@ let types: [(String, String, String)] = [
     ("JSON", "json", "{}\n"),
     ("HTML", "html", "<!doctype html>\n"),
     ("CSV", "csv", ""),
+    ("Pages Document", "pages", ""),
 ]
 
 func finderDirectory() -> URL {
@@ -69,7 +71,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let (_, ext, body) = types[i]
             let url = uniqueURL(in: finderDirectory(), ext: ext)
             let attrs: [FileAttributeKey: Any]? = ext == "sh" ? [.posixPermissions: 0o755] : nil
-            FileManager.default.createFile(atPath: url.path, contents: Data(body.utf8), attributes: attrs)
+            if let template = Bundle.main.url(forResource: "Untitled", withExtension: ext) {
+                try? FileManager.default.copyItem(at: template, to: url)
+            } else {
+                FileManager.default.createFile(atPath: url.path, contents: Data(body.utf8), attributes: attrs)
+            }
             NSWorkspace.shared.activateFileViewerSelecting([url])
         }
         NSApp.terminate(nil)
