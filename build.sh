@@ -3,7 +3,7 @@ set -e
 cd "${0:A:h}"
 APP=NewFileMaker.app
 rm -rf $APP && mkdir -p $APP/Contents/{MacOS,Resources}
-swiftc -O main.swift -o $APP/Contents/MacOS/NewFileMaker
+swiftc -O main.swift EmailPDF.swift -o $APP/Contents/MacOS/NewFileMaker
 cp AppIcon.icns Templates/* $APP/Contents/Resources/
 cat > $APP/Contents/Info.plist <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -15,7 +15,7 @@ cat > $APP/Contents/Info.plist <<PLIST
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>LSUIElement</key><true/>
-<key>NSAppleEventsUsageDescription</key><string>Reads the folder open in Finder.</string>
+<key>NSAppleEventsUsageDescription</key><string>Reads the folder open in Finder and the emails selected in Mail.</string>
 <key>NSServices</key><array><dict>
 <key>NSMenuItem</key><dict><key>default</key><string>Copy Full Path</string></dict>
 <key>NSMessage</key><string>copyPath</string>
