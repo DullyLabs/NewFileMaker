@@ -27,4 +27,6 @@ cat > $APP/Contents/Info.plist <<PLIST
 PLIST
 ID=5D2G58P6ZB; security find-identity -v -p codesigning | grep -q $ID || ID=-
 codesign -s $ID --options runtime --entitlements NewFileMaker.entitlements -i com.dulangaj.NewFileMaker --force $APP
-echo "Built $PWD/$APP"
+sips -s format png AppIcon.icns --out Alfred/icon.png >/dev/null
+rm -f NewFileMaker.alfredworkflow && (cd Alfred && zip -qr ../NewFileMaker.alfredworkflow .)
+echo "Built $PWD/$APP and NewFileMaker.alfredworkflow"

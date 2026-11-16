@@ -71,6 +71,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // A launch to run the service isn't a default launch; skip the menu.
         if notification.userInfo?[NSApplication.launchIsDefaultUserInfoKey] as? Bool == false { return }
+        // Launched from Mail (by the Alfred hotkey): skip the menu and save the selected emails.
+        if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.mail" { return saveMailSelection() }
         NSApp.activate(ignoringOtherApps: true)
         // Offered only while Mail is open, so the menu never launches Mail.
         let mailOpen = !NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.mail").isEmpty
