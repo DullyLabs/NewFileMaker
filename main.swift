@@ -22,19 +22,11 @@ func finderDirectory() -> URL {
     return URL(fileURLWithPath: path ?? NSHomeDirectory() + "/Desktop")
 }
 
-func uniqueURL(in dir: URL, name: String = "Untitled", ext: String) -> URL {
-    var url = dir.appendingPathComponent("\(name).\(ext)")
-    var n = 2
-    while FileManager.default.fileExists(atPath: url.path) {
-        url = dir.appendingPathComponent("\(name) \(n).\(ext)")
-        n += 1
-    }
-    return url
-}
+enum Choice { case builtIn(Int), template(URL), openTemplates, mail }
 
 final class Picker: NSObject {
-    var choice: Int?
-    @objc func pick(_ item: NSMenuItem) { choice = item.tag }
+    var choice: Choice?
+    @objc func pick(_ item: NSMenuItem) { choice = item.representedObject as? Choice }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -76,30 +68,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         // Offered only while Mail is open, so the menu never launches Mail.
         let mailOpen = !NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.mail").isEmpty
-        let items = types.map { ($0.0, $0.1) } + (mailOpen ? [("Save Mail Selection as PDF", "pdf")] : [])
         let menu = NSMenu()
-        for (i, (title, ext)) in items.enumerated() {
-            if i == types.count { menu.addItem(.separator()) }
+        func add(_ title: String, _ icon: NSImage, _ choice: Choice) {
             let item = NSMenuItem(title: title, action: #selector(Picker.pick(_:)), keyEquivalent: "")
             item.target = picker
-            item.tag = i
-            item.image = NSWorkspace.shared.icon(for: UTType(filenameExtension: ext) ?? .data)
+            item.representedObject = choice
+            item.image = icon
             item.image?.size = NSSize(width: 18, height: 18)
             menu.addItem(item)
         }
+        for (i, (title, ext, _)) in types.enumerated() { add(title, NSWorkspace.shared.icon(for: UTType(filenameExtension: ext) ?? .data), .builtIn(i)) }
+        menu.addItem(.separator())
+        let found = templates()
+        for url in found { add(url.deletingPathExtension().lastPathComponent, NSWorkspace.shared.icon(forFile: url.path), .template(url)) }
+        if !found.isEmpty { menu.addItem(.separator()) }
+        add("Open Templates Folder", NSWorkspace.shared.icon(for: .folder), .openTemplates)
+        if mailOpen {
+            menu.addItem(.separator())
+            add("Save Mail Selection as PDF", NSWorkspace.shared.icon(for: .pdf), .mail)
+        }
         menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
 
-        if picker.choice == types.count { return saveMailSelection() }
-        if let i = picker.choice {
+        switch picker.choice {
+        case .mail: return saveMailSelection()
+        case .openTemplates:
+            try? FileManager.default.createDirectory(at: templatesFolder, withIntermediateDirectories: true)
+            NSWorkspace.shared.open(templatesFolder)
+        case .template(let template):
+            if let url = try? copyTemplate(template, to: finderDirectory()) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+        case .builtIn(let i):
             let (_, ext, body) = types[i]
-            let url = uniqueURL(in: finderDirectory(), ext: ext)
-            let attrs: [FileAttributeKey: Any]? = ext == "sh" ? [.posixPermissions: 0o755] : nil
-            if let template = Bundle.main.url(forResource: "Untitled", withExtension: ext) {
-                try? FileManager.default.copyItem(at: template, to: url)
+            let dir = finderDirectory()
+            if let template = Bundle.main.url(forResource: "Untitled", withExtension: ext), let url = try? copyTemplate(template, to: dir) {
+                NSWorkspace.shared.activateFileViewerSelecting([url])
             } else {
-                FileManager.default.createFile(atPath: url.path, contents: Data(body.utf8), attributes: attrs)
+                let url = uniqueURL(in: dir, ext: ext)
+                FileManager.default.createFile(atPath: url.path, contents: Data(body.utf8), attributes: ext == "sh" ? [.posixPermissions: 0o755] : nil)
+                NSWorkspace.shared.activateFileViewerSelecting([url])
             }
-            NSWorkspace.shared.activateFileViewerSelecting([url])
+        case nil: break
         }
         NSApp.terminate(nil)
     }

@@ -6,6 +6,8 @@ A Finder toolbar button for making new files. Click it, pick a file type, and yo
 
 The menu offers Text, Markdown, Rich Text, Shell Script, Python, Swift, JSON, HTML, CSV and Pages. The new file lands in the folder open in the front Finder window, and Finder selects it so you can rename it straight away. If `Untitled.txt` already exists you get `Untitled 2.txt`, and so on. Shell scripts start with a `#!/bin/zsh` line and are already executable. Pages files are blank documents.
 
+To add your own files to the menu, choose **Open Templates Folder** and drop them in (`~/Library/Application Support/NewFileMaker/Templates`): picking one copies it, so `Invoice.numbers` gives `Invoice.numbers`, then `Invoice 2.numbers`.
+
 Select emails in Mail, click the button and choose **Save Mail Selection as PDF** to get one PDF per email, named after its subject, in that folder. The option shows only while Mail is open.
 
 With Alfred, press ⌃Space: in Finder it opens the menu, in Mail it saves the selected emails as PDFs straight into the folder open in Finder.
