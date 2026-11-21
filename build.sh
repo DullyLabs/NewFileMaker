@@ -3,7 +3,7 @@ set -e
 cd "${0:A:h}"
 APP=NewFileMaker.app
 rm -rf $APP && mkdir -p $APP/Contents/{MacOS,Resources}
-swiftc -O main.swift Templates.swift EmailPDF.swift -o $APP/Contents/MacOS/NewFileMaker
+swiftc -O main.swift Finder.swift Templates.swift EmailPDF.swift -o $APP/Contents/MacOS/NewFileMaker
 cp AppIcon.icns Templates/* $APP/Contents/Resources/
 cat > $APP/Contents/Info.plist <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

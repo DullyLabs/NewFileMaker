@@ -1,4 +1,4 @@
-// Run: swiftc Templates.swift tests/main.swift -o $TMPDIR/t && $TMPDIR/t
+// Run: swiftc Finder.swift Templates.swift tests/main.swift -o $TMPDIR/t && $TMPDIR/t
 import Foundation
 
 let fm = FileManager.default
@@ -19,3 +19,6 @@ check(names == ["Makefile", "Makefile 2", "starter.sh", "starter 2.sh", "Skeleto
 check(fm.isExecutableFile(atPath: out.appending(path: "starter.sh").path), "scripts stay executable")
 check(fm.fileExists(atPath: out.appending(path: "Skeleton/sub/a.txt").path), "folders are copied whole")
 check(uniqueURL(in: out, name: "Email", ext: "pdf").lastPathComponent == "Email.pdf", "email PDF names unchanged")
+check(newFileFolder(path: nil, errorNumber: errAEEventNotPermitted) == nil, "Finder access denied gives no folder, not the Desktop")
+check(newFileFolder(path: nil, errorNumber: -600)?.path == NSHomeDirectory() + "/Desktop", "other script errors fall back to the Desktop")
+check(newFileFolder(path: "/tmp/x/", errorNumber: nil)?.path == "/tmp/x", "the Finder folder is used when allowed")

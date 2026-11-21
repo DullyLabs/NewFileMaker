@@ -16,10 +16,23 @@ let types: [(String, String, String)] = [
     ("Pages Document", "pages", ""),
 ]
 
-func finderDirectory() -> URL {
-    let src = "tell application \"Finder\" to POSIX path of (insertion location as alias)"
-    let path = NSAppleScript(source: src)?.executeAndReturnError(nil).stringValue
-    return URL(fileURLWithPath: path ?? NSHomeDirectory() + "/Desktop")
+// Explains that Finder access is off and offers to open its Settings pane.
+func showFinderDeniedAlert() {
+    NSApp.activate()
+    let alert = NSAlert()
+    alert.messageText = "New File Maker can't see your Finder folder"
+    alert.informativeText = "Allow it in Privacy & Security > Automation."
+    alert.addButton(withTitle: "Open Settings")
+    alert.addButton(withTitle: "Cancel")
+    if alert.runModal() == .alertFirstButtonReturn {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!)
+    }
+}
+
+// Makes a file in the Finder folder and selects it, or says why it couldn't.
+func makeFile(_ make: (URL) throws -> URL) {
+    guard let dir = finderDirectory() else { return showFinderDeniedAlert() }
+    do { NSWorkspace.shared.activateFileViewerSelecting([try make(dir)]) } catch { NSAlert(error: error).runModal() }
 }
 
 enum Choice { case builtIn(Int), template(URL), openTemplates, mail }
@@ -36,7 +49,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func saveMailSelection() {
         let list = NSAppleScript(source: "tell application \"Mail\"\nset out to {}\nrepeat with m in (get selection)\nset end of out to source of m\nend repeat\nout\nend tell")?.executeAndReturnError(nil)
         let sources = (0..<(list?.numberOfItems ?? 0)).compactMap { list?.atIndex($0 + 1)?.stringValue }
-        let dir = finderDirectory()
+        guard let dir = finderDirectory() else {
+            showFinderDeniedAlert()
+            return NSApp.terminate(nil)
+        }
         Task { @MainActor in
             let renderer = EmailPDF()
             var saved: [URL] = []
@@ -94,17 +110,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .openTemplates:
             try? FileManager.default.createDirectory(at: templatesFolder, withIntermediateDirectories: true)
             NSWorkspace.shared.open(templatesFolder)
-        case .template(let template):
-            if let url = try? copyTemplate(template, to: finderDirectory()) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+        case .template(let template): makeFile { try copyTemplate(template, to: $0) }
         case .builtIn(let i):
             let (_, ext, body) = types[i]
-            let dir = finderDirectory()
-            if let template = Bundle.main.url(forResource: "Untitled", withExtension: ext), let url = try? copyTemplate(template, to: dir) {
-                NSWorkspace.shared.activateFileViewerSelecting([url])
-            } else {
+            makeFile { dir in
+                if let template = Bundle.main.url(forResource: "Untitled", withExtension: ext) { return try copyTemplate(template, to: dir) }
                 let url = uniqueURL(in: dir, ext: ext)
-                FileManager.default.createFile(atPath: url.path, contents: Data(body.utf8), attributes: ext == "sh" ? [.posixPermissions: 0o755] : nil)
-                NSWorkspace.shared.activateFileViewerSelecting([url])
+                try Data(body.utf8).write(to: url, options: .withoutOverwriting)
+                if ext == "sh" { try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path) }
+                return url
             }
         case nil: break
         }
