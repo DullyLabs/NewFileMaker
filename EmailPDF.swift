@@ -7,7 +7,8 @@ struct MIMEPart {
     let body: String
 
     init(raw: String) {
-        let split = raw.range(of: "\n\n")
+        // A part that opens with a blank line has no headers.
+        let split = raw.hasPrefix("\n") ? raw.startIndex..<raw.index(after: raw.startIndex) : raw.range(of: "\n\n")
         body = split.map { String(raw[$0.upperBound...]) } ?? ""
         var h: [String: String] = [:]
         let head = split.map { String(raw[..<$0.lowerBound]) } ?? raw
@@ -54,8 +55,16 @@ func decodeText(_ data: Data, charset: String?) -> String {
     return String(data: data, encoding: encoding) ?? String(decoding: data, as: UTF8.self)
 }
 
+/// File names are capped at 255 bytes; leave room for " 2" and ".pdf".
+func cappedFileName(_ name: String) -> String {
+    var name = name
+    while name.utf8.count > 240 { name.removeLast() }
+    return name
+}
+
 func decodeQP(_ s: String) -> Data {
-    let bytes = Array(s.replacingOccurrences(of: "=\n", with: "").data(using: .isoLatin1)!)
+    let joined = s.replacingOccurrences(of: "=\n", with: "")
+    let bytes = Array(joined.data(using: .isoLatin1) ?? Data(joined.utf8))
     var out = Data()
     var i = 0
     while i < bytes.count {
@@ -108,11 +117,12 @@ func escapeHTML(_ s: String) -> String {
     func save(source: Data, in dir: URL) async throws -> URL {
         let raw = String(data: source, encoding: .isoLatin1)!.replacingOccurrences(of: "\r\n", with: "\n")
         let message = MIMEPart(raw: raw)
-        let parts = message.leaves.filter { !$0.isAttachment }
+        let leaves = message.leaves
+        let parts = leaves.filter { !$0.isAttachment }
         var html = parts.first { $0.type == "text/html" }?.text
             ?? "<pre style='white-space:pre-wrap;font:13px -apple-system'>\(escapeHTML(parts.first { $0.type == "text/plain" }?.text ?? ""))</pre>"
-        for part in message.leaves {
-            guard let id = part.headers["content-id"]?.trimmingCharacters(in: CharacterSet(charactersIn: "<> ")) else { continue }
+        for part in leaves {
+            guard let id = part.headers["content-id"]?.trimmingCharacters(in: CharacterSet(charactersIn: "<> ")), html.contains("cid:\(id)") else { continue }
             html = html.replacingOccurrences(of: "cid:\(id)", with: "data:\(part.type);base64,\(part.data.base64EncodedString())")
         }
         let header = ["From", "To", "Cc", "Date", "Subject"].compactMap { key in
@@ -122,7 +132,8 @@ func escapeHTML(_ s: String) -> String {
 
         await withCheckedContinuation { loaded = $0; web.loadHTMLString(page, baseURL: nil) }
 
-        let subject = decodeHeader(message.headers["subject"] ?? "").components(separatedBy: CharacterSet(charactersIn: "/:\n")).joined(separator: "-")
+        var subject = decodeHeader(message.headers["subject"] ?? "").components(separatedBy: CharacterSet(charactersIn: "/:\n")).joined(separator: "-")
+        subject = cappedFileName(subject)
         let out = uniqueURL(in: dir, name: subject.trimmingCharacters(in: .whitespaces).isEmpty ? "Email" : subject, ext: "pdf")
         let info = NSPrintInfo()
         info.jobDisposition = .save
