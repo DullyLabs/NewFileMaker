@@ -1,4 +1,4 @@
-// Run: swiftc Finder.swift Templates.swift tests/main.swift -o $TMPDIR/t && $TMPDIR/t
+// Run: swiftc Finder.swift Templates.swift EmailPDF.swift tests/main.swift -o $TMPDIR/t && $TMPDIR/t
 import Foundation
 
 let fm = FileManager.default
@@ -22,3 +22,6 @@ check(uniqueURL(in: out, name: "Email", ext: "pdf").lastPathComponent == "Email.
 check(newFileFolder(path: nil, errorNumber: errAEEventNotPermitted) == nil, "Finder access denied gives no folder, not the Desktop")
 check(newFileFolder(path: nil, errorNumber: -600)?.path == NSHomeDirectory() + "/Desktop", "other script errors fall back to the Desktop")
 check(newFileFolder(path: "/tmp/x/", errorNumber: nil)?.path == "/tmp/x", "the Finder folder is used when allowed")
+check(cappedFileName(String(repeating: "é", count: 300)).utf8.count <= 240, "long non-Latin subjects fit in a file name")
+check(MIMEPart(raw: "\nbody").headers.isEmpty && MIMEPart(raw: "\nbody").body == "body", "a part opening with a blank line has no headers")
+check(String(decoding: decodeQP("caf=C3=A9 \u{4F60}"), as: UTF8.self) == "café \u{4F60}", "quoted-printable with non-Latin text does not crash")

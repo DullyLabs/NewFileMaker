@@ -55,6 +55,13 @@ func decodeText(_ data: Data, charset: String?) -> String {
     return String(data: data, encoding: encoding) ?? String(decoding: data, as: UTF8.self)
 }
 
+/// File names are capped at 255 bytes; leave room for " 2" and ".pdf".
+func cappedFileName(_ name: String) -> String {
+    var name = name
+    while name.utf8.count > 240 { name.removeLast() }
+    return name
+}
+
 func decodeQP(_ s: String) -> Data {
     let joined = s.replacingOccurrences(of: "=\n", with: "")
     let bytes = Array(joined.data(using: .isoLatin1) ?? Data(joined.utf8))
@@ -126,7 +133,7 @@ func escapeHTML(_ s: String) -> String {
         await withCheckedContinuation { loaded = $0; web.loadHTMLString(page, baseURL: nil) }
 
         var subject = decodeHeader(message.headers["subject"] ?? "").components(separatedBy: CharacterSet(charactersIn: "/:\n")).joined(separator: "-")
-        while subject.utf8.count > 240 { subject.removeLast() }  // file names are capped at 255 bytes
+        subject = cappedFileName(subject)
         let out = uniqueURL(in: dir, name: subject.trimmingCharacters(in: .whitespaces).isEmpty ? "Email" : subject, ext: "pdf")
         let info = NSPrintInfo()
         info.jobDisposition = .save
