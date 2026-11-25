@@ -148,7 +148,7 @@ func escapeHTML(_ s: String) -> String {
             printed = $0
             op.runModal(for: window, delegate: self, didRun: #selector(didPrint(_:success:context:)), contextInfo: nil)
         }
-        guard ok else { throw CocoaError(.fileWriteUnknown) }
+        guard ok, FileManager.default.fileExists(atPath: out.path) else { throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: out.path]) }
         return out
     }
 
@@ -164,4 +164,10 @@ func escapeHTML(_ s: String) -> String {
         printed?.resume(returning: success)
         printed = nil
     }
+}
+
+/// The alert shown when some emails couldn't be saved; each error names its PDF.
+func pdfFailureAlert(_ errors: [Error]) -> (title: String, text: String) {
+    let title = errors.count == 1 ? "1 email couldn't be saved as a PDF" : "\(errors.count) emails couldn't be saved as PDFs"
+    return (title, errors.map(\.localizedDescription).joined(separator: "\n"))
 }

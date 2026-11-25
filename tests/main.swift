@@ -25,3 +25,7 @@ check(newFileFolder(path: "/tmp/x/", errorNumber: nil)?.path == "/tmp/x", "the F
 check(cappedFileName(String(repeating: "é", count: 300)).utf8.count <= 240, "long non-Latin subjects fit in a file name")
 check(MIMEPart(raw: "\nbody").headers.isEmpty && MIMEPart(raw: "\nbody").body == "body", "a part opening with a blank line has no headers")
 check(String(decoding: decodeQP("caf=C3=A9 \u{4F60}"), as: UTF8.self) == "café \u{4F60}", "quoted-printable with non-Latin text does not crash")
+check(mailSelection(list: nil, error: [NSAppleScript.errorNumber: errAEEventNotPermitted]) == .denied, "Mail access off is reported, not read as no emails")
+check(mailSelection(list: nil, error: [NSAppleScript.errorNumber: -600, NSAppleScript.errorMessage: "Mail isn’t running."]) == .failed("Mail isn’t running."), "other Mail script errors are reported")
+check(pdfFailureAlert([CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: "/ro/Hi.pdf"])]).title == "1 email couldn't be saved as a PDF", "a failed PDF is counted in the alert")
+check(pdfFailureAlert([CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: "/ro/Hi.pdf"])]).text.contains("Hi.pdf"), "the alert names the PDF that failed")

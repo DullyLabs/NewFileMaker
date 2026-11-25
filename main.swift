@@ -16,23 +16,35 @@ let types: [(String, String, String)] = [
     ("Pages Document", "pages", ""),
 ]
 
-// Explains that Finder access is off and offers to open its Settings pane.
-func showFinderDeniedAlert() {
+// Brings the app forward first: launched from Mail by Alfred, it isn't active.
+@discardableResult func show(_ alert: NSAlert) -> NSApplication.ModalResponse {
     NSApp.activate()
+    return alert.runModal()
+}
+
+func show(_ title: String, _ text: String = "") {
     let alert = NSAlert()
-    alert.messageText = "New File Maker can't see your Finder folder"
+    alert.messageText = title
+    alert.informativeText = text
+    show(alert)
+}
+
+// Explains that Automation access to an app is off and offers to open its Settings pane.
+func showDeniedAlert(_ what: String) {
+    let alert = NSAlert()
+    alert.messageText = "New File Maker can't see \(what)"
     alert.informativeText = "Allow it in Privacy & Security > Automation."
     alert.addButton(withTitle: "Open Settings")
     alert.addButton(withTitle: "Cancel")
-    if alert.runModal() == .alertFirstButtonReturn {
+    if show(alert) == .alertFirstButtonReturn {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!)
     }
 }
 
 // Makes a file in the Finder folder and selects it, or says why it couldn't.
 func makeFile(_ make: (URL) throws -> URL) {
-    guard let dir = finderDirectory() else { return showFinderDeniedAlert() }
-    do { NSWorkspace.shared.activateFileViewerSelecting([try make(dir)]) } catch { NSAlert(error: error).runModal() }
+    guard let dir = finderDirectory() else { return showDeniedAlert("your Finder folder") }
+    do { NSWorkspace.shared.activateFileViewerSelecting([try make(dir)]) } catch { show(NSAlert(error: error)) }
 }
 
 enum Choice { case builtIn(Int), template(URL), openTemplates, mail }
@@ -47,19 +59,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // Saves each email selected in Mail as a PDF in the Finder folder.
     func saveMailSelection() {
-        let list = NSAppleScript(source: "tell application \"Mail\"\nset out to {}\nrepeat with m in (get selection)\nset end of out to source of m\nend repeat\nout\nend tell")?.executeAndReturnError(nil)
-        let sources = (0..<(list?.numberOfItems ?? 0)).compactMap { list?.atIndex($0 + 1)?.stringValue }
+        let sources: [String]
+        switch mailSelection() {
+        case .emails(let found) where found.isEmpty: show("No emails are selected in Mail"); return NSApp.terminate(nil)
+        case .emails(let found): sources = found
+        case .denied: showDeniedAlert("your Mail selection"); return NSApp.terminate(nil)
+        case .failed(let message): show("New File Maker can't read your Mail selection", message); return NSApp.terminate(nil)
+        }
         guard let dir = finderDirectory() else {
-            showFinderDeniedAlert()
+            showDeniedAlert("your Finder folder")
             return NSApp.terminate(nil)
         }
         Task { @MainActor in
             let renderer = EmailPDF()
-            var saved: [URL] = []
+            var saved: [URL] = [], failed: [Error] = []
             for source in sources {
-                if let pdf = try? await renderer.save(source: Data(source.utf8), in: dir) { saved.append(pdf) }
+                do { saved.append(try await renderer.save(source: Data(source.utf8), in: dir)) } catch { failed.append(error) }
             }
-            NSWorkspace.shared.activateFileViewerSelecting(saved)
+            if !saved.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(saved) }
+            if !failed.isEmpty { let (title, text) = pdfFailureAlert(failed); show(title, text) }
             NSApp.terminate(nil)
         }
     }
