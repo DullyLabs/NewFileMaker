@@ -102,6 +102,7 @@ func escapeHTML(_ s: String) -> String {
     private let window: NSWindow
     private var loaded: CheckedContinuation<Void, Never>?
     private var printed: CheckedContinuation<Bool, Never>?
+    private var blocksRemote = false
 
     override init() {
         let config = WKWebViewConfiguration()
@@ -130,6 +131,15 @@ func escapeHTML(_ s: String) -> String {
         }.joined()
         let page = "<meta charset='utf-8'><div style='font:13px -apple-system;padding-bottom:8px;margin-bottom:12px;border-bottom:1px solid #ccc'>\(header)</div>\(html)"
 
+        if !blocksRemote {
+            // Senders can't see the email was opened: block every scheme:// load (images, CSS, fonts, frames, refreshes).
+            // The page (about:blank) and inline cid: images (data: URLs) don't match, so they still render.
+            let rules = #"[{"trigger":{"url-filter":"^[a-z0-9+.-]+://"},"action":{"type":"block"}}]"#
+            if let list = try await WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "BlockRemote", encodedContentRuleList: rules) {
+                web.configuration.userContentController.add(list)
+            }
+            blocksRemote = true
+        }
         await withCheckedContinuation { loaded = $0; web.loadHTMLString(page, baseURL: nil) }
 
         var subject = decodeHeader(message.headers["subject"] ?? "").components(separatedBy: CharacterSet(charactersIn: "/:\n")).joined(separator: "-")
