@@ -1,5 +1,6 @@
 // Run: swiftc Finder.swift Templates.swift EmailPDF.swift tests/main.swift -o $TMPDIR/t && $TMPDIR/t
-import Foundation
+import AppKit
+import Network
 
 let fm = FileManager.default
 let root = URL(filePath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory()).appending(path: UUID().uuidString)
@@ -29,3 +30,29 @@ check(mailSelection(list: nil, error: [NSAppleScript.errorNumber: errAEEventNotP
 check(mailSelection(list: nil, error: [NSAppleScript.errorNumber: -600, NSAppleScript.errorMessage: "Mail isn’t running."]) == .failed("Mail isn’t running."), "other Mail script errors are reported")
 check(pdfFailureAlert([CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: "/ro/Hi.pdf"])]).title == "1 email couldn't be saved as a PDF", "a failed PDF is counted in the alert")
 check(pdfFailureAlert([CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: "/ro/Hi.pdf"])]).text.contains("Hi.pdf"), "the alert names the PDF that failed")
+
+// Saving an email as a PDF makes no network requests (issue #5).
+var hits = 0
+let listener = try NWListener(using: .tcp, on: .any)
+listener.newConnectionHandler = { c in hits += 1; c.cancel() }
+listener.start(queue: .main)
+while listener.port == nil { RunLoop.main.run(until: .now + 0.05) }
+let remote = "http://127.0.0.1:\(listener.port!.rawValue)"
+let png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
+let email = """
+Subject: Tracked\nContent-Type: multipart/related; boundary=b\n\n--b\nContent-Type: text/html\n
+<meta http-equiv="refresh" content="0;url=\(remote)/x"><link rel=stylesheet href="\(remote)/s.css"><link rel=preconnect href="\(remote)">
+<style>@import url(\(remote)/i.css); @font-face{font-family:f;src:url(\(remote)/f.woff)} p{font-family:f;background:url(\(remote)/b.png)}</style>
+<p>Hi</p><img src="\(remote)/p.png"><img srcset="\(remote)/s.png 2x"><iframe src="\(remote)/frame"></iframe><img src="cid:pic">
+--b\nContent-Type: image/png\nContent-ID: <pic>\nContent-Transfer-Encoding: base64\n\n\(png)\n--b--\n
+"""
+_ = NSApplication.shared
+var saved: URL?
+var saveError: Error?
+Task { @MainActor in
+    do { saved = try await EmailPDF().save(source: Data(email.utf8), in: out) } catch { saveError = error }
+}
+while saved == nil && saveError == nil { RunLoop.main.run(until: .now + 0.05) }
+RunLoop.main.run(until: .now + 1) // give a late meta refresh time to fire
+check(saveError == nil && fm.fileExists(atPath: saved!.path), "an email with remote content still saves as a PDF")
+check(hits == 0, "saving an email as a PDF makes no network requests (\(hits) made)")
