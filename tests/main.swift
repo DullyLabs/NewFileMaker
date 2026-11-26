@@ -29,3 +29,6 @@ check(mailSelection(list: nil, error: [NSAppleScript.errorNumber: errAEEventNotP
 check(mailSelection(list: nil, error: [NSAppleScript.errorNumber: -600, NSAppleScript.errorMessage: "Mail isn’t running."]) == .failed("Mail isn’t running."), "other Mail script errors are reported")
 check(pdfFailureAlert([CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: "/ro/Hi.pdf"])]).title == "1 email couldn't be saved as a PDF", "a failed PDF is counted in the alert")
 check(pdfFailureAlert([CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: "/ro/Hi.pdf"])]).text.contains("Hi.pdf"), "the alert names the PDF that failed")
+let filter = try NSRegularExpression(pattern: (try JSONSerialization.jsonObject(with: Data(EmailPDF.blockRemote.utf8)) as! [[String: [String: String]]])[0]["trigger"]!["url-filter"]!, options: .caseInsensitive)
+func blocks(_ url: String) -> Bool { filter.firstMatch(in: url, range: NSRange(url.startIndex..., in: url)) != nil }
+check(["https://t.co/p.png", "HTTP://x/s.css", "ftp://x/f", "webcal://x"].allSatisfy(blocks) && !["about:blank", "data:image/png;base64,AA=="].contains(where: blocks), "emails load no remote content; the page and inline images still load")
